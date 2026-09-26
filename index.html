@@ -1,0 +1,1175 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Lambo Simulator</title>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#050505;font-family:Arial}
+canvas{display:block}
+
+#loading{
+position:fixed;inset:0;z-index:99;
+display:flex;align-items:center;justify-content:center;
+flex-direction:column;background:#050505;color:white
+}
+#loading h1{font-size:42px;letter-spacing:4px;margin-bottom:15px}
+#loading span{color:#e7c94a}
+
+#ui{
+display:none;position:fixed;inset:0;z-index:10;
+pointer-events:none;color:white
+}
+
+#title{
+position:absolute;top:20px;left:25px;
+font-size:25px;font-weight:bold;
+letter-spacing:2px;text-shadow:0 3px 8px #000
+}
+#title span{color:#e7c94a}
+
+#help{
+position:absolute;top:20px;right:25px;
+padding:12px 15px;background:#0009;
+border-radius:10px;font-size:13px;
+line-height:1.7
+}
+
+#speedBox{
+position:absolute;right:25px;bottom:25px;
+width:170px;padding:15px;
+border-radius:12px;background:#000b;
+text-align:center;border:1px solid #ffffff33
+}
+
+#speed{
+font-size:42px;font-weight:bold
+}
+
+#kmh{font-size:13px;opacity:.7}
+
+#gear{
+margin-top:5px;color:#e7c94a;
+font-weight:bold
+}
+
+#buttons{
+position:absolute;left:25px;bottom:25px;
+pointer-events:auto
+}
+
+button{
+border:0;border-radius:10px;
+background:#000c;color:white;
+padding:13px 18px;
+margin-right:6px;
+cursor:pointer;font-weight:bold
+}
+
+button:hover{
+background:#e7c94a;color:#111
+}
+
+.touch{
+position:absolute;
+width:70px;height:70px;
+border-radius:50%;
+border:1px solid #ffffff55;
+background:#0008;color:white;
+font-size:25px;
+pointer-events:auto
+}
+
+#left{left:25px;bottom:110px}
+#right{left:105px;bottom:110px}
+#gas{right:25px;bottom:115px}
+#brake{right:105px;bottom:115px}
+
+@media(min-width:900px){
+#touchControls{display:none}
+}
+</style>
+</head>
+
+<body>
+
+<div id="loading">
+<h1>LAMBO <span>SIMULATOR</span></h1>
+<p>Loading 3D World...</p>
+</div>
+
+<div id="ui">
+
+<div id="title">
+LAMBO <span>SIMULATOR</span>
+</div>
+
+<div id="help">
+W / ↑ = Accelerate<br>
+S / ↓ = Brake<br>
+A / ← = Left<br>
+D / → = Right<br>
+R = Reset
+</div>
+
+<div id="speedBox">
+<div id="speed">0</div>
+<div id="kmh">KM/H</div>
+<div id="gear">GEAR N</div>
+</div>
+
+<div id="buttons">
+<button onclick="resetCar()">RESET</button>
+<button onclick="cameraChange()">CAMERA</button>
+<button onclick="fullscreen()">FULLSCREEN</button>
+</div>
+
+<div id="touchControls">
+
+<button class="touch" id="left">◀</button>
+<button class="touch" id="right">▶</button>
+<button class="touch" id="brake">▼</button>
+<button class="touch" id="gas">▲</button>
+
+</div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<script>
+
+let scene;
+let camera;
+let renderer;
+let car;
+
+let wheels=[];
+
+let carSpeed=0;
+let steering=0;
+
+let gas=false;
+let brake=false;
+let left=false;
+let right=false;
+
+let cameraMode=0;
+
+const clock=new THREE.Clock();
+
+
+/* START */
+
+function start(){
+
+scene=new THREE.Scene();
+
+scene.background=new THREE.Color(0x87ceeb);
+
+scene.fog=new THREE.Fog(
+0x87ceeb,
+80,
+450
+);
+
+
+camera=new THREE.PerspectiveCamera(
+65,
+window.innerWidth/window.innerHeight,
+0.1,
+1000
+);
+
+camera.position.set(0,5,10);
+
+
+renderer=new THREE.WebGLRenderer({
+antialias:true
+});
+
+renderer.setSize(
+window.innerWidth,
+window.innerHeight
+);
+
+renderer.setPixelRatio(
+Math.min(window.devicePixelRatio,2)
+);
+
+renderer.shadowMap.enabled=true;
+
+document.body.appendChild(
+renderer.domElement
+);
+
+
+lights();
+
+world();
+
+createCar();
+
+keyboard();
+
+touch();
+
+window.addEventListener(
+"resize",
+resize
+);
+
+
+document.getElementById(
+"loading"
+).style.display="none";
+
+document.getElementById(
+"ui"
+).style.display="block";
+
+
+animate();
+
+}
+
+
+/* LIGHTS */
+
+function lights(){
+
+let ambient=
+new THREE.HemisphereLight(
+0xffffff,
+0x445566,
+1.8
+);
+
+scene.add(ambient);
+
+
+let sun=
+new THREE.DirectionalLight(
+0xffffff,
+2.5
+);
+
+sun.position.set(
+100,
+150,
+80
+);
+
+sun.castShadow=true;
+
+scene.add(sun);
+
+}
+
+
+/* WORLD */
+
+function world(){
+
+/* GRASS */
+
+let grass=
+new THREE.Mesh(
+new THREE.PlaneGeometry(
+1000,
+1000
+),
+new THREE.MeshStandardMaterial({
+color:0x356b32
+})
+);
+
+grass.rotation.x=-Math.PI/2;
+
+grass.receiveShadow=true;
+
+scene.add(grass);
+
+
+/* ROAD */
+
+let road=
+new THREE.Mesh(
+new THREE.PlaneGeometry(
+24,
+1000
+),
+new THREE.MeshStandardMaterial({
+color:0x303030
+})
+);
+
+road.rotation.x=-Math.PI/2;
+
+road.position.y=.02;
+
+road.receiveShadow=true;
+
+scene.add(road);
+
+
+/* ROAD LINES */
+
+let edgeMaterial=
+new THREE.MeshStandardMaterial({
+color:0xf4d35e
+});
+
+
+[-11.2,11.2].forEach(x=>{
+
+let line=
+new THREE.Mesh(
+new THREE.BoxGeometry(
+.25,
+.04,
+1000
+),
+edgeMaterial
+);
+
+line.position.set(
+x,
+.05,
+0
+);
+
+scene.add(line);
+
+});
+
+
+/* CENTER */
+
+for(
+let z=-480;
+z<500;
+z+=18
+){
+
+let line=
+new THREE.Mesh(
+new THREE.BoxGeometry(
+.35,
+.03,
+8
+),
+new THREE.MeshStandardMaterial({
+color:0xffffff
+})
+);
+
+line.position.set(
+0,
+.06,
+z
+);
+
+scene.add(line);
+
+}
+
+
+/* BUILDINGS */
+
+for(
+let z=-450;
+z<450;
+z+=35
+){
+
+building(
+-28,
+z,
+8+Math.random()*8,
+12+Math.random()*20
+);
+
+building(
+28,
+z+15,
+8+Math.random()*8,
+12+Math.random()*20
+);
+
+}
+
+
+/* TREES */
+
+for(
+let z=-440;
+z<440;
+z+=22
+){
+
+tree(
+-17,
+z+Math.random()*8
+);
+
+tree(
+17,
+z+Math.random()*8
+);
+
+}
+
+}
+
+
+/* BUILDING */
+
+function building(
+x,
+z,
+width,
+height
+){
+
+let b=
+new THREE.Mesh(
+new THREE.BoxGeometry(
+width,
+height,
+14
+),
+new THREE.MeshStandardMaterial({
+color:0x555b60
+})
+);
+
+b.position.set(
+x,
+height/2,
+z
+);
+
+b.castShadow=true;
+
+scene.add(b);
+
+}
+
+
+/* TREE */
+
+function tree(x,z){
+
+let group=
+new THREE.Group();
+
+
+let trunk=
+new THREE.Mesh(
+new THREE.CylinderGeometry(
+.35,
+.5,
+3,
+8
+),
+new THREE.MeshStandardMaterial({
+color:0x5b3924
+})
+);
+
+trunk.position.y=1.5;
+
+group.add(trunk);
+
+
+let leaves=
+new THREE.Mesh(
+new THREE.SphereGeometry(
+2.1,
+10,
+8
+),
+new THREE.MeshStandardMaterial({
+color:0x1c6b31
+})
+);
+
+leaves.position.y=4;
+
+group.add(leaves);
+
+
+group.position.set(
+x,
+0,
+z
+);
+
+scene.add(group);
+
+}
+
+
+/* CAR */
+
+function createCar(){
+
+car=new THREE.Group();
+
+
+let gold=
+new THREE.MeshStandardMaterial({
+color:0xc9a900,
+metalness:.75,
+roughness:.2
+});
+
+
+/* BODY */
+
+let body=
+new THREE.Mesh(
+new THREE.BoxGeometry(
+2.4,
+.55,
+4.7
+),
+gold
+);
+
+body.position.y=.75;
+
+body.castShadow=true;
+
+car.add(body);
+
+
+/* LOWER */
+
+let lower=
+new THREE.Mesh(
+new THREE.BoxGeometry(
+2.55,
+.35,
+3.9
+),
+gold
+);
+
+lower.position.y=.52;
+
+car.add(lower);
+
+
+/* CABIN */
+
+let cabin=
+new THREE.Mesh(
+new THREE.BoxGeometry(
+1.75,
+.65,
+2
+),
+new THREE.MeshStandardMaterial({
+color:0x11151b,
+metalness:.3,
+roughness:.1
+})
+);
+
+cabin.position.set(
+0,
+1.25,
+-.15
+);
+
+car.add(cabin);
+
+
+/* GLASS */
+
+let glass=
+new THREE.Mesh(
+new THREE.BoxGeometry(
+1.55,
+.38,
+.08
+),
+new THREE.MeshStandardMaterial({
+color:0x152f3d,
+transparent:true,
+opacity:.75
+})
+);
+
+glass.position.set(
+0,
+1.28,
+.92
+);
+
+glass.rotation.x=-.2;
+
+car.add(glass);
+
+
+/* WHEELS */
+
+let positions=[
+[-1.18,.48,1.45],
+[1.18,.48,1.45],
+[-1.18,.48,-1.45],
+[1.18,.48,-1.45]
+];
+
+
+positions.forEach(p=>{
+
+let wheel=
+new THREE.Mesh(
+new THREE.CylinderGeometry(
+.48,
+.48,
+.3,
+20
+),
+new THREE.MeshStandardMaterial({
+color:0x111111
+})
+);
+
+wheel.rotation.z=
+Math.PI/2;
+
+wheel.position.set(
+p[0],
+p[1],
+p[2]
+);
+
+car.add(wheel);
+
+wheels.push(wheel);
+
+});
+
+
+/* LIGHTS */
+
+headlight(-.75,1,2.38);
+headlight(.75,1,2.38);
+
+tailLight(-.75,.95,-2.38);
+tailLight(.75,.95,-2.38);
+
+
+scene.add(car);
+
+}
+
+
+/* HEADLIGHT */
+
+function headlight(x,y,z){
+
+let l=
+new THREE.Mesh(
+new THREE.BoxGeometry(
+.45,
+.18,
+.08
+),
+new THREE.MeshStandardMaterial({
+color:0xffffff,
+emissive:0xffffff,
+emissiveIntensity:3
+})
+);
+
+l.position.set(
+x,
+y,
+z
+);
+
+car.add(l);
+
+}
+
+
+/* TAIL */
+
+function tailLight(x,y,z){
+
+let l=
+new THREE.Mesh(
+new THREE.BoxGeometry(
+.45,
+.15,
+.08
+),
+new THREE.MeshStandardMaterial({
+color:0xff1111,
+emissive:0xff0000,
+emissiveIntensity:2
+})
+);
+
+l.position.set(
+x,
+y,
+z
+);
+
+car.add(l);
+
+}
+
+
+/* KEYBOARD */
+
+function keyboard(){
+
+window.addEventListener(
+"keydown",
+function(e){
+
+if(
+e.key==="w" ||
+e.key==="W" ||
+e.key==="ArrowUp"
+)
+gas=true;
+
+
+if(
+e.key==="s" ||
+e.key==="S" ||
+e.key==="ArrowDown"
+)
+brake=true;
+
+
+if(
+e.key==="a" ||
+e.key==="A" ||
+e.key==="ArrowLeft"
+)
+left=true;
+
+
+if(
+e.key==="d" ||
+e.key==="D" ||
+e.key==="ArrowRight"
+)
+right=true;
+
+
+if(
+e.key==="r" ||
+e.key==="R"
+)
+resetCar();
+
+});
+
+
+window.addEventListener(
+"keyup",
+function(e){
+
+if(
+e.key==="w" ||
+e.key==="W" ||
+e.key==="ArrowUp"
+)
+gas=false;
+
+
+if(
+e.key==="s" ||
+e.key==="S" ||
+e.key==="ArrowDown"
+)
+brake=false;
+
+
+if(
+e.key==="a" ||
+e.key==="A" ||
+e.key==="ArrowLeft"
+)
+left=false;
+
+
+if(
+e.key==="d" ||
+e.key==="D" ||
+e.key==="ArrowRight"
+)
+right=false;
+
+});
+
+}
+
+
+/* TOUCH */
+
+function touch(){
+
+bind(
+"gas",
+()=>gas=true,
+()=>gas=false
+);
+
+bind(
+"brake",
+()=>brake=true,
+()=>brake=false
+);
+
+bind(
+"left",
+()=>left=true,
+()=>left=false
+);
+
+bind(
+"right",
+()=>right=true,
+()=>right=false
+);
+
+}
+
+
+function bind(
+id,
+down,
+up
+){
+
+let button=
+document.getElementById(id);
+
+
+button.addEventListener(
+"touchstart",
+function(e){
+
+e.preventDefault();
+
+down();
+
+},
+{passive:false}
+);
+
+
+button.addEventListener(
+"touchend",
+function(e){
+
+e.preventDefault();
+
+up();
+
+},
+{passive:false}
+);
+
+
+button.addEventListener(
+"mousedown",
+down
+);
+
+button.addEventListener(
+"mouseup",
+up
+);
+
+button.addEventListener(
+"mouseleave",
+up
+);
+
+}
+
+
+/* PHYSICS */
+
+function updateCar(dt){
+
+if(gas){
+
+carSpeed+=100*dt;
+
+}else{
+
+carSpeed-=25*dt;
+
+}
+
+
+if(brake){
+
+carSpeed-=150*dt;
+
+}
+
+
+carSpeed=
+THREE.MathUtils.clamp(
+carSpeed,
+0,
+260
+);
+
+
+/* STEERING */
+
+let target=0;
+
+
+if(left)
+target=1;
+
+
+if(right)
+target=-1;
+
+
+steering=
+THREE.MathUtils.lerp(
+steering,
+target,
+dt*7
+);
+
+
+car.rotation.y+=
+steering*
+(carSpeed/260)*
+dt*
+1.8;
+
+
+/* MOVEMENT */
+
+let direction=
+new THREE.Vector3(
+Math.sin(car.rotation.y),
+0,
+Math.cos(car.rotation.y)
+);
+
+
+car.position.addScaledVector(
+direction,
+-(carSpeed/260)*35*dt
+);
+
+
+/* WHEELS */
+
+wheels.forEach(
+function(w){
+
+w.rotation.x-=
+(carSpeed/260)*15*dt;
+
+});
+
+
+/* ROAD LIMIT */
+
+car.position.x=
+THREE.MathUtils.clamp(
+car.position.x,
+-10,
+10
+);
+
+
+/* UI */
+
+document.getElementById(
+"speed"
+).innerText=
+Math.round(carSpeed);
+
+
+let gear="N";
+
+if(carSpeed>5)gear="1";
+if(carSpeed>45)gear="2";
+if(carSpeed>85)gear="3";
+if(carSpeed>130)gear="4";
+if(carSpeed>180)gear="5";
+if(carSpeed>225)gear="6";
+
+
+document.getElementById(
+"gear"
+).innerText=
+"GEAR "+gear;
+
+}
+
+
+/* CAMERA */
+
+function updateCamera(){
+
+let target;
+
+
+if(cameraMode===0){
+
+target=
+new THREE.Vector3(
+car.position.x,
+car.position.y+4,
+car.position.z+9
+);
+
+}else{
+
+target=
+new THREE.Vector3(
+car.position.x,
+car.position.y+1.5,
+car.position.z+3
+);
+
+}
+
+
+camera.position.lerp(
+target,
+.08
+);
+
+
+camera.lookAt(
+car.position.x,
+car.position.y+1,
+car.position.z-5
+);
+
+}
+
+
+/* RESET */
+
+function resetCar(){
+
+carSpeed=0;
+
+steering=0;
+
+car.position.set(
+0,
+0,
+0
+);
+
+car.rotation.set(
+0,
+0,
+0
+);
+
+}
+
+
+/* CAMERA BUTTON */
+
+function cameraChange(){
+
+cameraMode=
+cameraMode===0
+?1
+:0;
+
+}
+
+
+/* FULLSCREEN */
+
+function fullscreen(){
+
+if(
+!document.fullscreenElement
+){
+
+document.documentElement.requestFullscreen();
+
+}else{
+
+document.exitFullscreen();
+
+}
+
+}
+
+
+/* RESIZE */
+
+function resize(){
+
+camera.aspect=
+window.innerWidth/
+window.innerHeight;
+
+camera.updateProjectionMatrix();
+
+renderer.setSize(
+window.innerWidth,
+window.innerHeight
+);
+
+}
+
+
+/* GAME LOOP */
+
+function animate(){
+
+requestAnimationFrame(
+animate
+);
+
+let dt=
+Math.min(
+clock.getDelta(),
+.05
+);
+
+updateCar(dt);
+
+updateCamera();
+
+renderer.render(
+scene,
+camera
+);
+
+}
+
+
+start();
+
+</script>
+
+</body>
+</html>
+```
